@@ -1,0 +1,8 @@
+# Helm values for prometheus-community/prometheus-node-exporter
+# Tolerates pinecone.io/dedicated taints so node-exporter runs on all nodes
+# IMPORTANT: Do NOT use a wildcard toleration (operator: Exists without a key)
+# as it triggers the Kyverno protect-dedicated-nodes policy, causing pod churn.
+tolerations:
+  - key: pinecone.io/dedicated
+    operator: Exists
+    effect: NoSchedule

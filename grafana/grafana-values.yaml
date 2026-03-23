@@ -1,0 +1,42 @@
+# Helm values for grafana/grafana
+# Change adminPassword before deploying to production.
+adminUser: admin
+adminPassword: pinecone-monitoring
+
+service:
+  type: NodePort
+  nodePort: 30300
+
+persistence:
+  enabled: true
+  size: 10Gi
+
+# Recreate strategy avoids PVC multi-attach errors on rolling updates
+strategy:
+  type: Recreate
+
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+    - name: Prometheus
+      type: prometheus
+      url: http://prometheus-server.prometheus.svc.cluster.local
+      access: proxy
+      isDefault: true
+
+dashboardProviders:
+  dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+    - name: default
+      orgId: 1
+      folder: ''
+      type: file
+      disableDeletion: false
+      editable: true
+      options:
+        path: /var/lib/grafana/dashboards/default
+
+dashboardsConfigMaps:
+  default: grafana-dashboards

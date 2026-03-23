@@ -1,0 +1,506 @@
+{
+  "uid": "pinecone-byoc-index-metrics",
+  "title": "Pinecone BYOC - Index Metrics",
+  "description": "Pinecone BYOC index-level metrics: operational stats, container resources, and API metrics",
+  "tags": ["pinecone", "byoc", "index-metrics"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 3,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "fiscalYearStartMonth": 0,
+  "liveNow": false,
+  "editable": true,
+  "graphTooltip": 1,
+  "templating": {
+    "list": [
+      {
+        "name": "namespace",
+        "type": "query",
+        "query": "label_values(kube_pod_info{namespace=~\"pc-pp-.*\"}, namespace)",
+        "datasource": "Prometheus",
+        "refresh": 2,
+        "includeAll": true,
+        "allValue": "pc-pp-.*",
+        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "multi": true,
+        "sort": 1
+      },
+      {
+        "name": "index_name",
+        "type": "query",
+        "query": "label_values(pinecone_db_record_total, index_name)",
+        "datasource": "Prometheus",
+        "refresh": 2,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "multi": true,
+        "sort": 1
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Pinecone Index Pod Resources",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "collapsed": false
+    },
+    {
+      "type": "stat",
+      "title": "Active Index Pods",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          },
+          "color": { "mode": "thresholds" }
+        },
+        "overrides": []
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "graphMode": "none", "textMode": "auto", "colorMode": "value" },
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "count(kube_pod_info{namespace=~\"$namespace\", namespace=~\"pc-pp-.*\"})",
+          "legendFormat": "Active Pods",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Total Index CPU Usage",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 2 },
+              { "color": "red", "value": 4 }
+            ]
+          },
+          "color": { "mode": "thresholds" }
+        },
+        "overrides": []
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "graphMode": "area", "textMode": "auto", "colorMode": "value" },
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", namespace=~\"pc-pp-.*\", container!=\"\", container!=\"POD\"}[5m]))",
+          "legendFormat": "CPU Cores",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Total Index Memory Usage",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 4294967296 },
+              { "color": "red", "value": 8589934592 }
+            ]
+          },
+          "color": { "mode": "thresholds" }
+        },
+        "overrides": []
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "graphMode": "area", "textMode": "auto", "colorMode": "value" },
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "sum(container_memory_working_set_bytes{namespace=~\"$namespace\", namespace=~\"pc-pp-.*\", container!=\"\", container!=\"POD\"})",
+          "legendFormat": "Memory",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Total Records",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "blue", "value": null }
+            ]
+          },
+          "color": { "mode": "thresholds" }
+        },
+        "overrides": []
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "graphMode": "none", "textMode": "auto", "colorMode": "value" },
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "sum(pinecone_db_record_total{index_name=~\"$index_name\"})",
+          "legendFormat": "Records",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Index Pod CPU & Memory Over Time",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "CPU Usage by Index Pod",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 20, "pointSize": 5, "showPoints": "never", "spanNulls": true }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "lastNotNull"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "sum by (pod, namespace) (rate(container_cpu_usage_seconds_total{namespace=~\"$namespace\", namespace=~\"pc-pp-.*\", container!=\"\", container!=\"POD\"}[5m]))",
+          "legendFormat": "{{namespace}}/{{pod}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Memory Usage by Index Pod",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": { "drawStyle": "line", "lineWidth": 1, "fillOpacity": 20, "pointSize": 5, "showPoints": "never", "spanNulls": true }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "lastNotNull"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "sum by (pod, namespace) (container_memory_working_set_bytes{namespace=~\"$namespace\", namespace=~\"pc-pp-.*\", container!=\"\", container!=\"POD\"})",
+          "legendFormat": "{{namespace}}/{{pod}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Pinecone API Metrics",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+      "collapsed": false
+    },
+    {
+      "type": "stat",
+      "title": "Total Records per Index",
+      "gridPos": { "h": 5, "w": 12, "x": 0, "y": 15 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] },
+          "color": { "mode": "thresholds" }
+        },
+        "overrides": []
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "graphMode": "none", "textMode": "value_and_name", "colorMode": "value" },
+      "targets": [
+        { "datasource": "Prometheus", "expr": "sum by (index_name) (pinecone_db_record_total{index_name=~\"$index_name\"})", "legendFormat": "{{index_name}}", "refId": "A" }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Storage Size per Index",
+      "gridPos": { "h": 5, "w": 12, "x": 12, "y": 15 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "purple", "value": null }] },
+          "color": { "mode": "thresholds" }
+        },
+        "overrides": []
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "graphMode": "none", "textMode": "value_and_name", "colorMode": "value" },
+      "targets": [
+        { "datasource": "Prometheus", "expr": "sum by (index_name) (pinecone_db_storage_size_bytes{index_name=~\"$index_name\"})", "legendFormat": "{{index_name}}", "refId": "A" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "DRN CPU Usage % by Index",
+      "description": "CPU usage percentage per DRN shard from the Pinecone API",
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 20 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 15, "pointSize": 5, "showPoints": "never", "spanNulls": true }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "lastNotNull"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        { "datasource": "Prometheus", "expr": "pinecone_db_drn_cpu_usage_percent{index_name=~\"$index_name\"}", "legendFormat": "{{index_name}} shard-{{shard_id}}", "refId": "A" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Query Rate by Index",
+      "description": "Query operations per second",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 15, "pointSize": 5, "showPoints": "never", "spanNulls": true }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        { "datasource": "Prometheus", "expr": "sum by (index_name) (rate(pinecone_db_op_query_count{index_name=~\"$index_name\"}[5m]))", "legendFormat": "{{index_name}}", "refId": "A" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Upsert Rate by Index",
+      "description": "Upsert operations per second",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 15, "pointSize": 5, "showPoints": "never", "spanNulls": true }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        { "datasource": "Prometheus", "expr": "sum by (index_name) (rate(pinecone_db_op_upsert_count{index_name=~\"$index_name\"}[5m]))", "legendFormat": "{{index_name}}", "refId": "A" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Avg Query Latency by Index",
+      "description": "Average query processing time",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 36 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "pointSize": 5, "showPoints": "never", "spanNulls": true }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        { "datasource": "Prometheus", "expr": "(sum by (index_name) (rate(pinecone_db_op_query_duration_sum{index_name=~\"$index_name\"}[5m])))/(sum by (index_name) (rate(pinecone_db_op_query_count{index_name=~\"$index_name\"}[5m])))", "legendFormat": "{{index_name}}", "refId": "A" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Read/Write Units per Second",
+      "description": "Resource units consumed per second",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 36 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 15, "pointSize": 5, "showPoints": "never", "spanNulls": true }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        { "datasource": "Prometheus", "expr": "sum by (index_name) (rate(pinecone_db_read_unit_count{index_name=~\"$index_name\"}[5m]))", "legendFormat": "{{index_name}} reads", "refId": "A" },
+        { "datasource": "Prometheus", "expr": "sum by (index_name) (rate(pinecone_db_write_unit_count{index_name=~\"$index_name\"}[5m]))", "legendFormat": "{{index_name}} writes", "refId": "B" }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Pinecone Internal Pod Metrics",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 44 },
+      "collapsed": false
+    },
+    {
+      "type": "timeseries",
+      "title": "DRN CPU Usage (Internal)",
+      "description": "Pinecone Data Region Node CPU usage from internal pod metrics",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 45 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 15, "pointSize": 5, "showPoints": "never", "spanNulls": true }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "lastNotNull"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        { "datasource": "Prometheus", "expr": "pinecone_public_drn_cpu_usage", "legendFormat": "{{app}} shard-{{shard_id}}", "refId": "A" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Request Rate (Internal)",
+      "description": "Request rate from internal pod metrics",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 45 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 15, "pointSize": 5, "showPoints": "never", "spanNulls": true }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "lastNotNull"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        { "datasource": "Prometheus", "expr": "sum by (app, request_type) (rate(pinecone_request_count[5m]))", "legendFormat": "{{app}} {{request_type}}", "refId": "A" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Request Latency P50 / P95 / P99 (Internal)",
+      "description": "Request latency percentiles from internal pod histogram metrics",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 53 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "pointSize": 5, "showPoints": "never", "spanNulls": true }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "lastNotNull"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        { "datasource": "Prometheus", "expr": "histogram_quantile(0.50, sum by (le, app) (rate(pinecone_request_latency_seconds_bucket[5m])))", "legendFormat": "{{app}} p50", "refId": "A" },
+        { "datasource": "Prometheus", "expr": "histogram_quantile(0.95, sum by (le, app) (rate(pinecone_request_latency_seconds_bucket[5m])))", "legendFormat": "{{app}} p95", "refId": "B" },
+        { "datasource": "Prometheus", "expr": "histogram_quantile(0.99, sum by (le, app) (rate(pinecone_request_latency_seconds_bucket[5m])))", "legendFormat": "{{app}} p99", "refId": "C" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Request Error Rate (Internal)",
+      "description": "Request errors per second from internal pod metrics",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 53 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 15, "pointSize": 5, "showPoints": "never", "spanNulls": true },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "lastNotNull"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        { "datasource": "Prometheus", "expr": "sum by (app) (rate(pinecone_request_error_count[5m]))", "legendFormat": "{{app}} errors", "refId": "A" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Vector Count (Internal)",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 61 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 15, "pointSize": 5, "showPoints": "never", "spanNulls": true }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        { "datasource": "Prometheus", "expr": "sum by (app) (pinecone_public_index_vector_count)", "legendFormat": "{{app}}", "refId": "A" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Read/Write Units (Internal)",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 61 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 15, "pointSize": 5, "showPoints": "never", "spanNulls": true }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max", "lastNotNull"] },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        { "datasource": "Prometheus", "expr": "sum by (app) (rate(pinecone_public_read_units[5m]))", "legendFormat": "{{app}} reads", "refId": "A" },
+        { "datasource": "Prometheus", "expr": "sum by (app) (rate(pinecone_public_write_units[5m]))", "legendFormat": "{{app}} writes", "refId": "B" }
+      ]
+    }
+  ]
+}

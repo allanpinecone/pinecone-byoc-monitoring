@@ -1,0 +1,96 @@
+# Additional Prometheus scrape jobs for Pinecone BYOC monitoring.
+#
+# These jobs should be APPENDED to the existing prometheus.yml scrape_configs
+# that ships with the BYOC cluster. Do not replace the existing config — merge
+# these jobs into it.
+#
+# Placeholders you must replace:
+#   YOUR_PROJECT_ID        — Pinecone project ID (UUID from console URL or metrics)
+#   YOUR_BYOC_DOMAIN       — BYOC metrics domain (e.g. preprod-aws-us-east-2-xxxx.byoc)
+#   /etc/pinecone/api-key  — path where the Pinecone API key secret is mounted
+
+# --- Infrastructure scrape jobs (no Pinecone API key needed) ----------------
+
+- job_name: node-exporter
+  kubernetes_sd_configs:
+  - role: endpoints
+    namespaces:
+      names:
+      - prometheus
+  relabel_configs:
+  - action: keep
+    source_labels:
+    - __meta_kubernetes_service_name
+    regex: node-exporter-prometheus-node-exporter
+  - action: replace
+    source_labels:
+    - __meta_kubernetes_endpoint_node_name
+    target_label: node
+
+- job_name: kube-state-metrics
+  static_configs:
+  - targets:
+    - kube-state-metrics.prometheus.svc.cluster.local:8080
+
+- job_name: kubelet-cadvisor
+  scheme: https
+  tls_config:
+    ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    insecure_skip_verify: true
+  bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+  kubernetes_sd_configs:
+  - role: node
+  relabel_configs:
+  - action: labelmap
+    regex: __meta_kubernetes_node_label_(.+)
+  - target_label: __address__
+    replacement: kubernetes.default.svc:443
+  - source_labels:
+    - __meta_kubernetes_node_name
+    regex: (.+)
+    target_label: __metrics_path__
+    replacement: /api/v1/nodes/$1/proxy/metrics/cadvisor
+
+- job_name: kubelet
+  scheme: https
+  tls_config:
+    ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    insecure_skip_verify: true
+  bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+  kubernetes_sd_configs:
+  - role: node
+  relabel_configs:
+  - action: labelmap
+    regex: __meta_kubernetes_node_label_(.+)
+  - target_label: __address__
+    replacement: kubernetes.default.svc:443
+  - source_labels:
+    - __meta_kubernetes_node_name
+    regex: (.+)
+    target_label: __metrics_path__
+    replacement: /api/v1/nodes/$1/proxy/metrics
+
+# --- Pinecone API metrics (requires API key) --------------------------------
+
+# Dynamic discovery via Pinecone API — automatically finds all metrics targets
+- job_name: pinecone-serverless-metrics
+  http_sd_configs:
+  - url: https://api.pinecone.io/prometheus/projects/YOUR_PROJECT_ID/metrics/discovery
+    refresh_interval: 1m
+    authorization:
+      type: Bearer
+      credentials_file: /etc/pinecone/api-key
+  authorization:
+    type: Bearer
+    credentials_file: /etc/pinecone/api-key
+
+# Static fallback — directly scrapes the BYOC metrics export endpoint
+- job_name: pinecone-byoc-metrics
+  scheme: https
+  metrics_path: /projects/YOUR_PROJECT_ID/metrics/export
+  static_configs:
+  - targets:
+    - metrics.YOUR_BYOC_DOMAIN.pinecone.io
+  authorization:
+    type: Bearer
+    credentials_file: /etc/pinecone/api-key
