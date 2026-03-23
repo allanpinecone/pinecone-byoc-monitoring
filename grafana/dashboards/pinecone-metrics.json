@@ -246,8 +246,9 @@
     },
     {
       "type": "stat",
-      "title": "Storage Size per Index",
-      "gridPos": { "h": 5, "w": 12, "x": 12, "y": 15 },
+      "title": "Storage Size per Index (API)",
+      "description": "From pinecone_db_storage_size_bytes. Note: this metric is only available for serverless indexes. BYOC indexes do not export storage size via the API.",
+      "gridPos": { "h": 5, "w": 6, "x": 12, "y": 15 },
       "datasource": "Prometheus",
       "fieldConfig": {
         "defaults": {
@@ -260,6 +261,25 @@
       "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "graphMode": "none", "textMode": "value_and_name", "colorMode": "value" },
       "targets": [
         { "datasource": "Prometheus", "expr": "sum by (index_name) (pinecone_db_storage_size_bytes{index_name=~\"$index_name\"})", "legendFormat": "{{index_name}}", "refId": "A" }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "BYOC Pod Memory per Index",
+      "description": "Working set memory across BYOC index pods (namespace pc-pp-*). Serves as a storage proxy for BYOC indexes which do not export pinecone_db_storage_size_bytes.",
+      "gridPos": { "h": 5, "w": 6, "x": 18, "y": 15 },
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "orange", "value": null }] },
+          "color": { "mode": "thresholds" }
+        },
+        "overrides": []
+      },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "graphMode": "none", "textMode": "value_and_name", "colorMode": "value" },
+      "targets": [
+        { "datasource": "Prometheus", "expr": "sum by (namespace) (container_memory_working_set_bytes{namespace=~\"pc-pp-.*\", container!=\"\", container!=\"POD\"})", "legendFormat": "{{namespace}}", "refId": "A" }
       ]
     },
     {
