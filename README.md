@@ -69,12 +69,13 @@ export BYOC_METRICS_DOMAIN="preprod-aws-us-east-2-xxxx.byoc"
 ```
 
 This will:
-1. Install `node-exporter` and `kube-state-metrics` via Helm
-2. Create a Kubernetes secret for the Pinecone API key
-3. Set up RBAC for Prometheus to scrape kubelet/cAdvisor metrics
-4. Merge monitoring scrape jobs into the existing Prometheus config
-5. Mount the API key into the Prometheus server pod
-6. Deploy Grafana with pre-configured dashboards
+1. **Auto-detect** whether the cluster is private or public access
+2. Install `node-exporter` and `kube-state-metrics` via Helm
+3. Create a Kubernetes secret for the Pinecone API key
+4. Set up RBAC for Prometheus to scrape kubelet/cAdvisor metrics
+5. Merge monitoring scrape jobs into the existing Prometheus config (using `metrics.private.*` for private clusters, `metrics.*` for public)
+6. Mount the API key into the Prometheus server pod
+7. Deploy Grafana with pre-configured dashboards
 
 ### 4. Access Grafana
 
@@ -86,7 +87,7 @@ GRAFANA_NODE=$(kubectl get pods -n grafana -l app.kubernetes.io/name=grafana \
   -o jsonpath='{.items[0].status.hostIP}')
 
 # SSH tunnel through the bastion
-ssh -L 3000:$GRAFANA_NODE:30300 -A ec2-user@<BASTION_IP>
+ssh -L 3000:$GRAFANA_NODE:30300 -A ec2-user@ec2-16-59-137-217.us-east-2.compute.amazonaws.com
 ```
 
 Then open [http://localhost:3000](http://localhost:3000) and log in with:
@@ -249,6 +250,13 @@ Verify targets in Prometheus:
 ```bash
 kubectl port-forward -n prometheus svc/prometheus-server 9090:80
 # Open http://localhost:9090/targets
+```
+
+If targets show TLS certificate errors (e.g. `x509: certificate is valid for *.private.… not metrics.…`), the cluster is private-access but the deploy script did not detect it. Re-run the deploy — it reads the `pc-pulumi-outputs` configmap to auto-detect. You can also inspect manually:
+
+```bash
+kubectl get configmap config -n pc-pulumi-outputs \
+  -o jsonpath='{.data.pulumi-outputs}' | python3 -m json.tool | grep public_access
 ```
 
 ### Grafana PVC multi-attach error on restart

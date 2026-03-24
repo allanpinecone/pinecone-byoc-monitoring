@@ -26,11 +26,34 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 PROMETHEUS_NS="${PROMETHEUS_NS:-prometheus}"
 GRAFANA_NS="${GRAFANA_NS:-grafana}"
 
+# ---- Detect private vs public cluster --------------------------------------
+# Check the pc-pulumi-outputs configmap for public_access_enabled.  Fall back
+# to the EKS API endpoint access configuration if the configmap is unavailable.
+PRIVATE_CLUSTER="false"
+PULUMI_JSON=$(kubectl get configmap config -n pc-pulumi-outputs \
+  -o jsonpath='{.data.pulumi-outputs}' 2>/dev/null || echo "")
+
+if [ -n "$PULUMI_JSON" ]; then
+  PAE=$(echo "$PULUMI_JSON" | python3 -c "import sys,json; print(json.load(sys.stdin).get('public_access_enabled','true'))" 2>/dev/null || echo "true")
+  if [ "$PAE" = "False" ] || [ "$PAE" = "false" ]; then
+    PRIVATE_CLUSTER="true"
+  fi
+fi
+
+if [ "$PRIVATE_CLUSTER" = "true" ]; then
+  METRICS_HOST_PREFIX="metrics.private."
+  echo "==> Detected PRIVATE BYOC cluster (public access disabled)"
+else
+  METRICS_HOST_PREFIX="metrics."
+  echo "==> Detected PUBLIC BYOC cluster"
+fi
+
 echo "==> Pinecone BYOC Monitoring Deployment"
-echo "    Project ID:     $PINECONE_PROJECT_ID"
-echo "    BYOC Domain:    $BYOC_METRICS_DOMAIN"
-echo "    Prometheus NS:  $PROMETHEUS_NS"
-echo "    Grafana NS:     $GRAFANA_NS"
+echo "    Project ID:      $PINECONE_PROJECT_ID"
+echo "    BYOC Domain:     $BYOC_METRICS_DOMAIN"
+echo "    Metrics Host:    ${METRICS_HOST_PREFIX}${BYOC_METRICS_DOMAIN}.pinecone.io"
+echo "    Prometheus NS:   $PROMETHEUS_NS"
+echo "    Grafana NS:      $GRAFANA_NS"
 echo ""
 
 # ---- Helm repos -----------------------------------------------------------
@@ -108,7 +131,8 @@ fi
 
 SCRAPE_JOBS=$(cat "$REPO_ROOT/prometheus/prometheus-scrape-jobs.yaml" \
   | sed "s|YOUR_PROJECT_ID|$PINECONE_PROJECT_ID|g" \
-  | sed "s|YOUR_BYOC_DOMAIN|$BYOC_METRICS_DOMAIN|g")
+  | sed "s|YOUR_BYOC_DOMAIN|$BYOC_METRICS_DOMAIN|g" \
+  | sed "s|YOUR_METRICS_HOST_PREFIX|$METRICS_HOST_PREFIX|g")
 
 EXISTING_YAML_BASE=$(echo "$EXISTING_CONFIG" | python3 -c "
 import sys, yaml
@@ -137,6 +161,7 @@ with open('$REPO_ROOT/prometheus/prometheus-scrape-jobs.yaml') as f:
     content = f.read()
     content = content.replace('YOUR_PROJECT_ID', '$PINECONE_PROJECT_ID')
     content = content.replace('YOUR_BYOC_DOMAIN', '$BYOC_METRICS_DOMAIN')
+    content = content.replace('YOUR_METRICS_HOST_PREFIX', '$METRICS_HOST_PREFIX')
     new_jobs = yaml.safe_load(content)
 
 existing_names = {j['job_name'] for j in existing.get('scrape_configs', [])}
